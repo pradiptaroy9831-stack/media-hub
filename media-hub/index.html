@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MediaHub</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--tx:#1d1d1b;--mu:#77756e;--ac:#e2552d;--bd:#e4e1d8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151514;--card:#1f1f1d;--tx:#f0eee8;--mu:#9a978e;--bd:#33322e}}
+:root[data-theme="dark"]{--bg:#151514;--card:#1f1f1d;--tx:#f0eee8;--mu:#9a978e;--bd:#33322e}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{display:flex;flex-direction:column;height:100%;max-width:900px;margin:0 auto}
+header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd)}
+header h1{font-size:19px;margin:0;flex:1;letter-spacing:-.3px}header h1 b{color:var(--ac)}
+#sbox{display:none;flex:1}#sbox input{width:100%}
+header.s h1{display:none}header.s #sbox{display:block}
+main{flex:1;overflow-y:auto;padding:16px}
+.pg{display:none}.pg.on{display:block}
+h2{margin:0 0 4px;font-size:20px}.mu{color:var(--mu);font-size:13px}
+input,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;width:100%}
+textarea{resize:vertical;min-height:70px}label{display:block;font-weight:600;font-size:13px;margin:14px 0 5px}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px}
+.ib{background:none;color:var(--tx);padding:6px;display:flex}
+.pri{background:var(--ac);color:#fff;padding:12px 18px;width:100%;font-weight:600;margin-top:18px}.pri:disabled{opacity:.5}
+.drop{border:2px dashed var(--bd);border-radius:14px;padding:22px;text-align:center;cursor:pointer;background:var(--card)}
+.drop:hover{border-color:var(--ac)}
+.prev{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pt{width:72px;height:72px;border-radius:8px;position:relative;background:#0002}.pt img,.pt video{border-radius:8px}.rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#c0392b;color:#fff;font-size:15px;line-height:20px;padding:0}
+.prev img,.prev video{width:100%;height:100%;object-fit:cover}
+.hint{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin-top:12px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden;cursor:pointer}
+.th{position:relative;aspect-ratio:1;background:#0003}
+.th img,.th video{width:100%;height:100%;object-fit:cover;display:block}
+.badge{position:absolute;top:6px;right:6px;background:#000a;color:#fff;font-size:12px;padding:2px 8px;border-radius:99px}
+.cb{padding:8px 10px}.cb p{margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hl{cursor:pointer;margin-right:6px;display:inline-block}.hl:hover{text-decoration:underline}.tg{color:var(--ac);font-size:12.5px;word-break:break-word}
+.empty{text-align:center;color:var(--mu);padding:50px 10px}
+nav{display:flex;border-top:1px solid var(--bd);background:var(--card);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;background:none;color:var(--mu);padding:9px 0 7px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;border-radius:0}
+nav button.on{color:var(--ac)}
+svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#modal{position:fixed;inset:0;background:#000d;display:none;z-index:9;overflow-y:auto;padding:16px}
+#modal.on{display:block}
+.mb{max-width:640px;margin:0 auto;background:var(--card);border-radius:14px;padding:14px}
+.mb img,.mb video{width:100%;border-radius:10px;margin-bottom:10px;display:block;max-height:75vh;object-fit:contain;background:#000}
+.row{display:flex;gap:8px;margin-top:10px}.row button{flex:1;padding:10px;background:var(--bg);color:var(--tx)}.row .del{background:#c0392b;color:#fff}
+#lb{position:fixed;inset:0;background:#000;z-index:20;display:none;align-items:center;justify-content:center}
+#lb.on{display:flex}#lb img{max-width:100%;max-height:100%;object-fit:contain}
+#lb button{position:absolute;background:#0008;color:#fff;width:44px;height:44px;border-radius:50%;font-size:26px;line-height:1;padding:0}
+#lc{top:calc(12px + env(safe-area-inset-top,0px));right:12px}#lp{left:10px;top:50%}#ln{right:10px;top:50%}
+#lt{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#fff;font-size:13px;text-shadow:0 1px 3px #000}
+.mb img{cursor:zoom-in}
+#msg{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:#222;color:#fff;padding:8px 16px;border-radius:99px;display:none;z-index:10;font-size:13px}
+</style></head><body>
+<div id="app">
+<header id="hd"><h1>Media<b>Hub</b></h1><div id="sbox"><input id="q" type="search" placeholder="Search captions or #hashtags"></div>
+<button class="ib" id="sb" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button></header>
+<main>
+<section class="pg on" id="p-upload"><h2>Upload</h2><div class="mu">Share photos or videos with a caption and hashtags.</div>
+<div id="warn" class="hint" style="display:none"></div>
+<label>Files</label>
+<div class="drop" id="drop">Tap to add photos / videos<div class="mu">Select several at once, or tap again to add more. Max 50 MB each.</div></div>
+<input type="file" id="file" accept="image/*,video/*" multiple hidden>
+<div class="prev" id="prev"></div><div class="hint" id="dest" style="display:none"></div>
+<label for="cap">Caption</label><input id="cap" maxlength="150" placeholder="Write a caption">
+<label for="tags">Hashtags</label><input id="tags" placeholder="#sunset #travel">
+<button class="pri" id="go" disabled>Post</button></section>
+<section class="pg" id="p-albums"><h2>Albums</h2><div class="mu">Multiple photos, videos, or a mix.</div><div class="grid" id="g-album"></div></section>
+<section class="pg" id="p-images"><h2>Images</h2><div class="mu">Single photo posts.</div><div class="grid" id="g-image"></div></section>
+<section class="pg" id="p-videos"><h2>Videos</h2><div class="mu">Single video posts.</div><div class="grid" id="g-video"></div></section>
+<section class="pg" id="p-search"><h2>Search results</h2><div class="mu" id="sq"></div><div class="grid" id="g-search"></div></section>
+</main>
+<nav id="nav"></nav></div>
+<div id="modal"><div class="mb" id="mb"></div></div><div id="lb"><img id="li" alt=""><button id="lc" aria-label="Close">×</button><button id="lp" aria-label="Previous">‹</button><button id="ln" aria-label="Next">›</button><div id="lt"></div></div><div id="msg"></div>
+<script>
+const ICONS={upload:'<path d="M12 16V4M6 10l6-6 6 6M4 20h16"/>',albums:'<rect x="3" y="7" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 012 2v12"/>',images:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',videos:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/>'};
+const $=id=>document.getElementById(id);let posts=[],me='anon',db=true,assets=true,files=[],page='upload',prev='upload',searching=false;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toast=t=>{const m=$('msg');m.textContent=t;m.style.display='block';setTimeout(()=>m.style.display='none',2600)};
+$('nav').innerHTML=Object.keys(ICONS).map(k=>`<button data-p="${k}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${k[0].toUpperCase()+k.slice(1)}</button>`).join('');
+$('nav').onclick=e=>{const b=e.target.closest('button');if(b)go(b.dataset.p)};
+function go(p){page=p;if(p==='search')return;document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-'+p));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$('hd').classList.remove('s');searching=false;$('q').value='';$('g-search').innerHTML='';render();document.querySelector('main').scrollTop=0}
+$('sb').onclick=()=>{const h=$('hd');if(!searching){searching=true;h.classList.add('s');$('q').focus()}else{go(page==='search'?prev:page)}};
+$('q').oninput=()=>{exact=false;const q=$('q').value.trim();
+if(!q){if(page==='search'){$('g-search').innerHTML='';go(prev)}else{searching=true}return}
+if(page!=='search')prev=page;
+document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';render()};
+const tagsHtml=p=>p.tags.map(t=>`<a class="hl" data-tag="${esc(t)}">${esc(t)}</a>`).join('');
+let exact=false;
+function searchTag(t){if(page!=='search')prev=page;exact=true;searching=true;$('hd').classList.add('s');$('q').value=t;document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';render();document.querySelector('main').scrollTop=0}
+function card(p){const m=p.media[0],t=m.kind==='video'?`<video src="${m.url}#t=0.1" preload="metadata" muted></video>`:`<img src="${m.url}" loading="lazy" alt="">`;
+return `<div class="card" data-id="${p.id}"><div class="th">${t}${p.media.length>1?`<span class="badge">${p.media.length} items</span>`:''}${p.type==='video'?'<span class="badge">▶</span>':''}</div><div class="cb"><p>${esc(p.caption)}</p><div class="tg">${tagsHtml(p)}</div></div></div>`}
+function fill(id,list,msg){$(id).innerHTML=list.length?list.map(card).join(''):`<div class="empty" style="grid-column:1/-1">${msg}</div>`}
+function render(){const s=[...posts].sort((a,b)=>b.ts-a.ts);
+fill('g-album',s.filter(p=>p.type==='album'),'No albums yet.');fill('g-image',s.filter(p=>p.type==='image'),'No images yet.');fill('g-video',s.filter(p=>p.type==='video'),'No videos yet.');
+const q=$('q').value.trim().toLowerCase();if(page==='search'){$('sq').textContent='For "'+q+'"';fill('g-search',s.filter(p=>exact?p.tags.some(t=>t.toLowerCase()===q):(p.caption.toLowerCase().includes(q)||p.tags.some(t=>t.toLowerCase().includes(q.replace(/^#/,''))))),'Nothing found.')}}
+document.querySelector('main').onclick=e=>{const tg=e.target.closest('[data-tag]');if(tg){searchTag(tg.dataset.tag);return}const c=e.target.closest('.card');if(c)openPost(c.dataset.id)};
+function openPost(id){const p=posts.find(x=>x.id===id);if(!p)return;
+$('mb').innerHTML=p.media.map(m=>m.kind==='video'?`<video src="${m.url}" controls playsinline></video>`:`<img src="${m.url}" alt="" data-u="${m.url}">`).join('')+`<b>${esc(p.caption)}</b><div class="tg">${tagsHtml(p)}</div><div class="mu">${new Date(p.ts).toLocaleString()}</div><div class="row">${p.mine?'<button class="del" id="dl">Delete my upload</button>':''}<button id="cl">Close</button></div>`;
+$('modal').classList.add('on');$('cl').onclick=closeM;const d=$('dl');if(d){let armed=false;d.onclick=()=>{if(!armed){armed=true;d.textContent='Tap again to confirm delete';setTimeout(()=>{armed=false;d.textContent='Delete my upload'},4000)}else del(p)}}}
+let lbList=[],lbI=0,mTop=0;
+function lbShow(){$('li').src=lbList[lbI];$('lt').textContent=lbList.length>1?(lbI+1)+' / '+lbList.length:'';$('lp').style.display=$('ln').style.display=lbList.length>1?'block':'none'}
+function lbOpen(u,p){lbList=p.media.filter(m=>m.kind==='image').map(m=>m.url);lbI=Math.max(0,lbList.indexOf(u));mTop=$('modal').scrollTop;lbShow();$('lb').classList.add('on')}
+function lbClose(){$('lb').classList.remove('on');$('li').removeAttribute('src');$('modal').scrollTop=mTop}
+function lbStep(d){lbI=(lbI+d+lbList.length)%lbList.length;lbShow()}
+$('mb').addEventListener('click',e=>{const tg=e.target.closest('[data-tag]');if(tg){const t=tg.dataset.tag;closeM();searchTag(t);return}const im=e.target.closest('img');if(im&&im.dataset.u){const id=posts.find(p=>p.media.some(m=>m.url===im.dataset.u));if(id)lbOpen(im.dataset.u,id)}});
+$('lc').onclick=lbClose;$('lp').onclick=e=>{e.stopPropagation();lbStep(-1)};$('ln').onclick=e=>{e.stopPropagation();lbStep(1)};
+$('lb').onclick=e=>{if(e.target.id==='lb')lbClose()};
+document.addEventListener('keydown',e=>{if(!$('lb').classList.contains('on')){if(e.key==='Escape')closeM();return}if(e.key==='Escape')lbClose();if(e.key==='ArrowLeft')lbStep(-1);if(e.key==='ArrowRight')lbStep(1)});
+let tx=0;$('lb').addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});$('lb').addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>60&&lbList.length>1)lbStep(d<0?1:-1)},{passive:true});
+function closeM(){$('modal').classList.remove('on');$('mb').innerHTML=''}
+$('modal').onclick=e=>{if(e.target.id==='modal')closeM()};
+async function del(p){if(!p.mine){toast('You can only delete your own uploads');return}try{const r=await fetch('/api/posts/'+p.id,{method:'DELETE',headers:{'x-user-id':me}});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'failed');posts=posts.filter(x=>x.id!==p.id);closeM();render();toast('Deleted')}catch(e){toast('Could not delete: '+(e.message||e.code||'error'))}}
+$('drop').textContent;$('drop').onclick=()=>$('file').click();
+$('file').onchange=()=>{for(const f of $('file').files){if(f.size>50*1048576){toast(f.name+' is over the 50 MB limit');continue}if(!files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))files.push(f)}$('file').value='';showPrev()};
+function showPrev(){const pv=$('prev');pv.innerHTML='';files.forEach((f,i)=>{const u=URL.createObjectURL(f);pv.insertAdjacentHTML('beforeend',`<div class="pt">${f.type.startsWith('video')?`<video src="${u}" muted></video>`:`<img src="${u}">`}<button class="rm" data-i="${i}" aria-label="Remove">×</button></div>`)});check()}
+$('prev').onclick=e=>{const b=e.target.closest('.rm');if(b){files.splice(+b.dataset.i,1);showPrev()}};
+const parseTags=()=>[...new Set(($('tags').value.match(/#?[\p{L}\p{N}_]+/gu)||[]).map(t=>t.startsWith('#')?t:'#'+t))];
+function kindOf(){const k=files.map(f=>f.type.startsWith('video')?'video':'image');return files.length===1?k[0]:'album'}
+function check(){const d=$('dest');if(files.length){d.style.display='block';const k=kindOf();d.textContent='This will be posted to: '+(k==='album'?'Albums':k==='image'?'Images':'Videos')}else d.style.display='none';
+$('go').disabled=!(files.length&&$('cap').value.trim()&&parseTags().length&&assets&&db)}
+$('cap').oninput=$('tags').oninput=check;
+$('go').onclick=async()=>{const b=$('go');b.disabled=true;b.textContent='Uploading…';
+try{const fd=new FormData();files.forEach(f=>fd.append('files',f));fd.append('caption',$('cap').value.trim());fd.append('tags',JSON.stringify(parseTags()));const r=await fetch('/api/posts',{method:'POST',headers:{'x-user-id':me},body:fd});const post=await r.json().catch(()=>({}));if(!r.ok)throw new Error(post.error||'Upload failed');const type=post.type;posts.push(post);files=[];$('file').value='';$('prev').innerHTML='';$('dest').style.display='none';$('cap').value=$('tags').value='';toast('Posted!');go(type==='album'?'albums':type==='image'?'images':'videos')}
+catch(e){toast('Upload failed: '+(e.message||e.code||'error'))}b.textContent='Post';check()};
+(()=>{try{me=localStorage.getItem('mh_uid')}catch(e){}
+if(!me||me==='anon'){me=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));try{localStorage.setItem('mh_uid',me)}catch(e){}}
+async function load(){try{const r=await fetch('/api/posts',{headers:{'x-user-id':me}});const d=await r.json();if(JSON.stringify(d)!==JSON.stringify(posts)){posts=d;render()}}catch(e){}}
+go('upload');load();setInterval(load,5000);check()})();
+</script></body></html>
