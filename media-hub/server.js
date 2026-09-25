@@ -4,17 +4,18 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = re
 const PORT = process.env.PORT || 3000;
 const MAX_MB = 50;
 
-const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_URL } = process.env;
-for (const [k, v] of Object.entries({ R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_URL })) {
+const { STORAGE_ENDPOINT, STORAGE_REGION, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY, STORAGE_BUCKET } = process.env;
+for (const [k, v] of Object.entries({ STORAGE_ENDPOINT, STORAGE_REGION, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY, STORAGE_BUCKET })) {
   if (!v) { console.error(`Missing required environment variable: ${k}. See README.md.`); process.exit(1); }
 }
-const PUBLIC_URL = R2_PUBLIC_URL.replace(/\/$/, '');
 const POSTS_KEY = 'posts.json';
 
+// Works with any S3-compatible storage (Backblaze B2, Cloudflare R2, etc) via env vars.
 const s3 = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: { accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY }
+  region: STORAGE_REGION,
+  endpoint: STORAGE_ENDPOINT,
+  forcePathStyle: true,
+  credentials: { accessKeyId: STORAGE_ACCESS_KEY_ID, secretAccessKey: STORAGE_SECRET_ACCESS_KEY }
 });
 
 const streamToString = async stream => {
@@ -26,7 +27,7 @@ const streamToString = async stream => {
 let posts = [];
 async function loadPosts() {
   try {
-    const r = await s3.send(new GetObjectCommand({ Bucket: R2_BUCKET, Key: POSTS_KEY }));
+    const r = await s3.send(new GetObjectCommand({ Bucket: STORAGE_BUCKET, Key: POSTS_KEY }));
     posts = JSON.parse(await streamToString(r.Body));
   } catch (e) {
     if (e.name === 'NoSuchKey' || e.$metadata?.httpStatusCode === 404) posts = [];
@@ -35,7 +36,7 @@ async function loadPosts() {
 }
 async function savePosts() {
   await s3.send(new PutObjectCommand({
-    Bucket: R2_BUCKET, Key: POSTS_KEY, Body: JSON.stringify(posts, null, 1), ContentType: 'application/json'
+    Bucket: STORAGE_BUCKET, Key: POSTS_KEY, Body: JSON.stringify(posts, null, 1), ContentType: 'application/json'
   }));
 }
 
@@ -51,18 +52,33 @@ const view = (p, u) => ({ id: p.id, type: p.type, caption: p.caption, tags: p.ta
 
 async function putMedia(file) {
   const ext = (path.extname(file.originalname) || '').toLowerCase().replace(/[^.a-z0-9]/g, '');
-  const key = 'media/' + crypto.randomUUID() + ext;
-  await s3.send(new PutObjectCommand({ Bucket: R2_BUCKET, Key: key, Body: file.buffer, ContentType: file.mimetype }));
-  return { key, url: `${PUBLIC_URL}/${key}`, kind: file.mimetype.startsWith('video') ? 'video' : 'image' };
+  const key = 'uploads/' + crypto.randomUUID() + ext;
+  await s3.send(new PutObjectCommand({ Bucket: STORAGE_BUCKET, Key: key, Body: file.buffer, ContentType: file.mimetype }));
+  return { key, url: `/media/${key}`, kind: file.mimetype.startsWith('video') ? 'video' : 'image' };
 }
 async function deleteMedia(list) {
   await Promise.all(list.map(m =>
-    s3.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: m.key })).catch(() => {})
+    s3.send(new DeleteObjectCommand({ Bucket: STORAGE_BUCKET, Key: m.key })).catch(() => {})
   ));
 }
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Streams a file straight from private storage. The bucket itself never
+// needs to be public — only this server holds the storage credentials.
+app.get('/media/*', async (req, res) => {
+  const key = req.params[0];
+  try {
+    const obj = await s3.send(new GetObjectCommand({ Bucket: STORAGE_BUCKET, Key: key }));
+    res.set('Content-Type', obj.ContentType || 'application/octet-stream');
+    if (obj.ContentLength) res.set('Content-Length', obj.ContentLength);
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    obj.Body.pipe(res);
+  } catch (e) {
+    res.status(404).end();
+  }
+});
 
 app.get('/api/posts', (req, res) => res.json(posts.map(p => view(p, uid(req)))));
 
@@ -113,4 +129,4 @@ app.delete('/api/posts/:id', async (req, res) => {
 
 loadPosts()
   .then(() => app.listen(PORT, () => console.log(`MediaHub running at http://localhost:${PORT}`)))
-  .catch(e => { console.error('Could not load posts from R2 on startup:', e.message); process.exit(1); });
+  .catch(e => { console.error('Could not load posts from storage on startup:', e.message); process.exit(1); });
