@@ -108,7 +108,7 @@ const q=$('q').value.trim().toLowerCase();if(page==='search'){$('sq').textConten
 document.querySelector('main').onclick=e=>{const tg=e.target.closest('[data-tag]');if(tg){searchTag(tg.dataset.tag);return}const c=e.target.closest('.card');if(c)openPost(c.dataset.id)};
 function openPost(id,np){const p=posts.find(x=>x.id===id);if(!p)return;
 $('mb').innerHTML=p.media.map(m=>m.kind==='video'?`<video src="${m.url}" controls playsinline preload="metadata"></video>`:`<img src="${m.small||m.url}" alt="" data-u="${m.url}" decoding="async"${m.w?` width="${m.w}" height="${m.h}"`:''}>`).join('')+`<b>${esc(p.caption)}</b><div class="tg">${tagsHtml(p)}</div><div class="mu">${new Date(p.ts).toLocaleString()}</div><div class="row">${p.type==='album'?'<button id="am">+ Add more</button>':''}${p.mine?'<button class="del" id="dl">Delete my upload</button>':''}<button id="cl">Close</button></div>`;
-$('modal').classList.add('on');if(!np)history.pushState({...history.state,modal:id},'');$('cl').onclick=closeM;const am=$('am');if(am)am.onclick=()=>{addId=p.id;$('file2').click()};const d=$('dl');if(d){let armed=false;d.onclick=()=>{if(!armed){armed=true;d.textContent='Tap again to confirm delete';setTimeout(()=>{armed=false;d.textContent='Delete my upload'},4000)}else del(p)}}}
+$('modal').classList.add('on');if(!np){$('modal').scrollTop=0;history.pushState({...history.state,modal:id},'')}$('cl').onclick=closeM;const am=$('am');if(am)am.onclick=()=>{addId=p.id;$('file2').click()};const d=$('dl');if(d){let armed=false;d.onclick=()=>{if(!armed){armed=true;d.textContent='Tap again to confirm delete';setTimeout(()=>{armed=false;d.textContent='Delete my upload'},4000)}else del(p)}}}
 let addId=null;
 $('file2').onchange=async()=>{const p=posts.find(x=>x.id===addId);const fl=[...$('file2').files];$('file2').value='';if(!p||!fl.length)return;
 const ok=fl.filter(f=>{if(f.size>50*1048576){toast(f.name+' is over the 50 MB limit');return false}return true});if(!ok.length)return;
@@ -127,7 +127,7 @@ $('lc').onclick=lbClose;$('lp').onclick=e=>{e.stopPropagation();lbStep(-1)};$('l
 $('lb').onclick=e=>{if(e.target.id==='lb')lbClose()};
 document.addEventListener('keydown',e=>{if(!$('lb').classList.contains('on')){if(e.key==='Escape')closeM();return}if(e.key==='Escape')lbClose();if(e.key==='ArrowLeft')lbStep(-1);if(e.key==='ArrowRight')lbStep(1)});
 let tx=0;$('lb').addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});$('lb').addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>60&&lbList.length>1)lbStep(d<0?1:-1)},{passive:true});
-function hardCloseM(){$('modal').classList.remove('on');$('mb').innerHTML=''}
+function hardCloseM(){$('modal').classList.remove('on');$('mb').innerHTML='';$('modal').scrollTop=0}
 function closeM(){if(history.state&&history.state.modal)history.back();else hardCloseM()}
 $('modal').onclick=e=>{if(e.target.id==='modal')closeM()};
 async function del(p){if(!p.mine){toast('You can only delete your own uploads');return}try{const r=await fetch('/api/posts/'+p.id,{method:'DELETE',headers:{'x-user-id':me}});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'failed');posts=posts.filter(x=>x.id!==p.id);closeM();render();toast('Deleted')}catch(e){toast('Could not delete: '+(e.message||e.code||'error'))}}
