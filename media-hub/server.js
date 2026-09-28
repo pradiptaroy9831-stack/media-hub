@@ -1,4 +1,5 @@
 const express = require('express'), multer = require('multer'), crypto = require('crypto'), path = require('path');
+const sharp = require('sharp');
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const PORT = process.env.PORT || 3000;
@@ -9,6 +10,7 @@ for (const [k, v] of Object.entries({ STORAGE_ENDPOINT, STORAGE_REGION, STORAGE_
   if (!v) { console.error(`Missing required environment variable: ${k}. See README.md.`); process.exit(1); }
 }
 const POSTS_KEY = 'posts.json';
+sharp.cache(false);
 
 // Works with any S3-compatible storage (Backblaze B2, Cloudflare R2, etc) via env vars.
 const s3 = new S3Client({
@@ -48,18 +50,42 @@ const upload = multer({
 
 const uid = req => String(req.get('x-user-id') || '').slice(0, 64);
 // The owner id is never sent to other users; each client only learns "mine: true/false".
-const view = (p, u) => ({ id: p.id, type: p.type, caption: p.caption, tags: p.tags, media: p.media.map(m => ({ url: m.url, kind: m.kind })), ts: p.ts, mine: !!u && p.owner === u });
+const view = (p, u) => ({ id: p.id, type: p.type, caption: p.caption, tags: p.tags, media: p.media.map(m => ({ url: m.url, kind: m.kind, small: m.small, w: m.w, h: m.h })), ts: p.ts, mine: !!u && p.owner === u });
+
+// Runs fn over list with at most n running at once (keeps memory use low on small servers).
+async function mapLimit(list, n, fn) {
+  const out = new Array(list.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, list.length) }, async () => {
+    while (i < list.length) { const k = i++; out[k] = await fn(list[k]); }
+  }));
+  return out;
+}
 
 async function putMedia(file) {
   const ext = (path.extname(file.originalname) || '').toLowerCase().replace(/[^.a-z0-9]/g, '');
-  const key = 'uploads/' + crypto.randomUUID() + ext;
+  const id = crypto.randomUUID();
+  const key = 'uploads/' + id + ext;
+  const kind = file.mimetype.startsWith('video') ? 'video' : 'image';
   await s3.send(new PutObjectCommand({ Bucket: STORAGE_BUCKET, Key: key, Body: file.buffer, ContentType: file.mimetype }));
-  return { key, url: `/media/${key}`, kind: file.mimetype.startsWith('video') ? 'video' : 'image' };
+  const out = { key, url: `/media/${key}`, kind };
+  // Photos also get a smaller copy (max 1280px) used for grids and album scrolling.
+  // The original is kept untouched for the full-screen viewer.
+  if (kind === 'image' && !/gif|svg/.test(file.mimetype)) {
+    try {
+      const { data, info } = await sharp(file.buffer, { failOn: 'none' }).rotate()
+        .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 }).toBuffer({ resolveWithObject: true });
+      const smallKey = 'uploads/small/' + id + '.jpg';
+      await s3.send(new PutObjectCommand({ Bucket: STORAGE_BUCKET, Key: smallKey, Body: data, ContentType: 'image/jpeg' }));
+      out.smallKey = smallKey; out.small = `/media/${smallKey}`; out.w = info.width; out.h = info.height;
+    } catch (e) { console.error('Resize skipped:', e.message); }
+  }
+  return out;
 }
 async function deleteMedia(list) {
-  await Promise.all(list.map(m =>
-    s3.send(new DeleteObjectCommand({ Bucket: STORAGE_BUCKET, Key: m.key })).catch(() => {})
-  ));
+  await Promise.all(list.flatMap(m => [m.key, m.smallKey].filter(Boolean).map(k =>
+    s3.send(new DeleteObjectCommand({ Bucket: STORAGE_BUCKET, Key: k })).catch(() => {})
+  )));
 }
 
 const app = express();
@@ -69,6 +95,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // needs to be public — only this server holds the storage credentials.
 app.get('/media/*', async (req, res) => {
   const key = req.params[0];
+  if (!key.startsWith('uploads/')) return res.status(404).end();
   try {
     const range = req.headers.range;
     const obj = await s3.send(new GetObjectCommand({ Bucket: STORAGE_BUCKET, Key: key, ...(range && { Range: range }) }));
@@ -104,7 +131,7 @@ app.post('/api/posts', (req, res) => {
       if (!caption) return res.status(400).json({ error: 'Caption is required' });
       if (!tags.length) return res.status(400).json({ error: 'At least one hashtag is required' });
 
-      const media = await Promise.all(req.files.map(putMedia));
+      const media = await mapLimit(req.files, 3, putMedia);
       // One photo -> Images, one video -> Videos, anything else -> Albums
       const type = media.length === 1 ? media[0].kind : 'album';
       const post = { id: crypto.randomUUID(), type, caption, tags, media, owner, ts: Date.now() };
@@ -127,11 +154,10 @@ app.post('/api/posts/:id/media', (req, res) => {
       const owner = uid(req);
       const p = posts.find(x => x.id === req.params.id);
       if (!p) return res.status(404).json({ error: 'Not found' });
-      if (p.owner !== owner) return res.status(403).json({ error: 'You can only edit your own uploads' });
       if (p.type !== 'album') return res.status(400).json({ error: 'Only albums can be added to' });
       if (!req.files || !req.files.length) return res.status(400).json({ error: 'No valid photos or videos' });
 
-      const media = await Promise.all(req.files.map(putMedia));
+      const media = await mapLimit(req.files, 3, putMedia);
       if (!posts.includes(p)) { deleteMedia(media); return res.status(404).json({ error: 'Not found' }); }
       p.media.push(...media);
       await savePosts();

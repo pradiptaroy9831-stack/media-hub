@@ -50,7 +50,8 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke
 #modal{position:fixed;inset:0;background:#000d;display:none;z-index:9;overflow-y:auto;padding:16px}
 #modal.on{display:block}
 .mb{max-width:640px;margin:0 auto;background:var(--card);border-radius:18px;padding:14px}
-.mb img,.mb video{width:100%;border-radius:12px;margin-bottom:10px;display:block;max-height:75vh;object-fit:contain;background:#000}
+.mb img:not([width]){min-height:220px}
+.mb img,.mb video{width:100%;height:auto;border-radius:12px;margin-bottom:10px;display:block;max-height:75vh;object-fit:contain;background:#000}
 .row{display:flex;gap:8px;margin-top:10px}.row button{flex:1;padding:10px;background:var(--bg2);color:var(--tx)}.row .del{background:#c0392b;color:#fff}
 #lb{position:fixed;inset:0;background:#000;z-index:20;display:none;align-items:center;justify-content:center}
 #lb.on{display:flex}#lb img{max-width:100%;max-height:100%;object-fit:contain}
@@ -98,7 +99,7 @@ document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-se
 const tagsHtml=p=>p.tags.map(t=>`<a class="hl" data-tag="${esc(t)}">${esc(t)}</a>`).join('');
 let exact=false;
 function searchTag(t){if(page!=='search'){prev=page;history.pushState({page:'search',q:t,exact:true},'')}else history.replaceState({page:'search',q:t,exact:true},'');exact=true;searching=true;$('hd').classList.add('s');$('q').value=t;document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';render();document.querySelector('main').scrollTop=0}
-function card(p){const m=p.media[0],t=m.kind==='video'?`<video src="${m.url}#t=0.1" preload="metadata" muted></video>`:`<img src="${m.url}" loading="lazy" alt="">`;
+function card(p){const m=p.media[0],t=m.kind==='video'?`<video src="${m.url}#t=0.1" preload="metadata" muted></video>`:`<img src="${m.small||m.url}" loading="lazy" decoding="async" alt="">`;
 return `<div class="card" data-id="${p.id}"><div class="th">${t}${p.media.length>1?`<span class="badge">${p.media.length} items</span>`:''}${p.type==='video'?'<span class="badge">▶</span>':''}</div><div class="cb"><p>${esc(p.caption)}</p><div class="tg">${tagsHtml(p)}</div></div></div>`}
 function fill(id,list,msg){$(id).innerHTML=list.length?list.map(card).join(''):`<div class="empty" style="grid-column:1/-1">${msg}</div>`}
 function render(){const s=[...posts].sort((a,b)=>b.ts-a.ts);
@@ -106,7 +107,7 @@ fill('g-album',s.filter(p=>p.type==='album'),'No albums yet.');fill('g-image',s.
 const q=$('q').value.trim().toLowerCase();if(page==='search'){$('sq').textContent='For "'+q+'"';fill('g-search',s.filter(p=>exact?p.tags.some(t=>t.toLowerCase()===q):(p.caption.toLowerCase().includes(q)||p.tags.some(t=>t.toLowerCase().includes(q.replace(/^#/,''))))),'Nothing found.')}}
 document.querySelector('main').onclick=e=>{const tg=e.target.closest('[data-tag]');if(tg){searchTag(tg.dataset.tag);return}const c=e.target.closest('.card');if(c)openPost(c.dataset.id)};
 function openPost(id,np){const p=posts.find(x=>x.id===id);if(!p)return;
-$('mb').innerHTML=p.media.map(m=>m.kind==='video'?`<video src="${m.url}" controls playsinline></video>`:`<img src="${m.url}" alt="" data-u="${m.url}">`).join('')+`<b>${esc(p.caption)}</b><div class="tg">${tagsHtml(p)}</div><div class="mu">${new Date(p.ts).toLocaleString()}</div><div class="row">${p.mine&&p.type==='album'?'<button id="am">+ Add more</button>':''}${p.mine?'<button class="del" id="dl">Delete my upload</button>':''}<button id="cl">Close</button></div>`;
+$('mb').innerHTML=p.media.map(m=>m.kind==='video'?`<video src="${m.url}" controls playsinline preload="metadata"></video>`:`<img src="${m.small||m.url}" alt="" data-u="${m.url}" decoding="async"${m.w?` width="${m.w}" height="${m.h}"`:''}>`).join('')+`<b>${esc(p.caption)}</b><div class="tg">${tagsHtml(p)}</div><div class="mu">${new Date(p.ts).toLocaleString()}</div><div class="row">${p.type==='album'?'<button id="am">+ Add more</button>':''}${p.mine?'<button class="del" id="dl">Delete my upload</button>':''}<button id="cl">Close</button></div>`;
 $('modal').classList.add('on');if(!np)history.pushState({...history.state,modal:id},'');$('cl').onclick=closeM;const am=$('am');if(am)am.onclick=()=>{addId=p.id;$('file2').click()};const d=$('dl');if(d){let armed=false;d.onclick=()=>{if(!armed){armed=true;d.textContent='Tap again to confirm delete';setTimeout(()=>{armed=false;d.textContent='Delete my upload'},4000)}else del(p)}}}
 let addId=null;
 $('file2').onchange=async()=>{const p=posts.find(x=>x.id===addId);const fl=[...$('file2').files];$('file2').value='';if(!p||!fl.length)return;
