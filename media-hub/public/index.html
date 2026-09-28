@@ -69,6 +69,7 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke
 <label>Files</label>
 <div class="drop" id="drop">Tap to add photos / videos<div class="mu">Select several at once, or tap again to add more. Max 50 MB each.</div></div>
 <input type="file" id="file" accept="image/*,video/*" multiple hidden>
+<input type="file" id="file2" accept="image/*,video/*" multiple hidden>
 <div class="prev" id="prev"></div><div class="hint" id="dest" style="display:none"></div>
 <label for="cap">Caption</label><input id="cap" maxlength="150" placeholder="Write a caption">
 <label for="tags">Hashtags</label><input id="tags" placeholder="#sunset #travel">
@@ -88,15 +89,15 @@ const toast=t=>{const m=$('msg');m.textContent=t;m.style.display='block';setTime
 $('nav').innerHTML=Object.keys(ICONS).map(k=>`<button data-p="${k}"><svg viewBox="0 0 24 24">${ICONS[k]}</svg>${k[0].toUpperCase()+k.slice(1)}</button>`).join('');
 $('nav').onclick=e=>{const b=e.target.closest('button');if(b)go(b.dataset.p)};
 $('logo').onclick=()=>go('upload');
-function go(p){page=p;if(p==='search')return;document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-'+p));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$('hd').classList.remove('s');searching=false;$('q').value='';$('g-search').innerHTML='';render();document.querySelector('main').scrollTop=0}
-$('sb').onclick=()=>{const h=$('hd');if(!searching){searching=true;h.classList.add('s');$('q').focus()}else{go(page==='search'?prev:page)}};
+function go(p,np){page=p;if(p==='search')return;if(!np&&!(history.state&&history.state.page===p&&!history.state.modal&&!history.state.lb))history.pushState({page:p},'');document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-'+p));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$('hd').classList.remove('s');searching=false;$('q').value='';$('g-search').innerHTML='';render();document.querySelector('main').scrollTop=0}
+$('sb').onclick=()=>{const h=$('hd');if(!searching){searching=true;h.classList.add('s');$('q').focus()}else{if(history.state&&history.state.page==='search')history.back();else go(page==='search'?prev:page)}};
 $('q').oninput=()=>{exact=false;const q=$('q').value.trim();
-if(!q){if(page==='search'){$('g-search').innerHTML='';go(prev)}else{searching=true}return}
-if(page!=='search')prev=page;
-document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';render()};
+if(!q){if(page==='search'){$('g-search').innerHTML='';if(history.state&&history.state.page==='search')history.back();else go(prev)}else{searching=true}return}
+if(page!=='search'){prev=page;history.pushState({page:'search'},'')}
+document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';history.replaceState({page:'search',q:$('q').value,exact:false},'');render()};
 const tagsHtml=p=>p.tags.map(t=>`<a class="hl" data-tag="${esc(t)}">${esc(t)}</a>`).join('');
 let exact=false;
-function searchTag(t){if(page!=='search')prev=page;exact=true;searching=true;$('hd').classList.add('s');$('q').value=t;document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';render();document.querySelector('main').scrollTop=0}
+function searchTag(t){if(page!=='search'){prev=page;history.pushState({page:'search',q:t,exact:true},'')}else history.replaceState({page:'search',q:t,exact:true},'');exact=true;searching=true;$('hd').classList.add('s');$('q').value=t;document.querySelectorAll('.pg').forEach(s=>s.classList.toggle('on',s.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';render();document.querySelector('main').scrollTop=0}
 function card(p){const m=p.media[0],t=m.kind==='video'?`<video src="${m.url}#t=0.1" preload="metadata" muted></video>`:`<img src="${m.url}" loading="lazy" alt="">`;
 return `<div class="card" data-id="${p.id}"><div class="th">${t}${p.media.length>1?`<span class="badge">${p.media.length} items</span>`:''}${p.type==='video'?'<span class="badge">▶</span>':''}</div><div class="cb"><p>${esc(p.caption)}</p><div class="tg">${tagsHtml(p)}</div></div></div>`}
 function fill(id,list,msg){$(id).innerHTML=list.length?list.map(card).join(''):`<div class="empty" style="grid-column:1/-1">${msg}</div>`}
@@ -104,20 +105,29 @@ function render(){const s=[...posts].sort((a,b)=>b.ts-a.ts);
 fill('g-album',s.filter(p=>p.type==='album'),'No albums yet.');fill('g-image',s.filter(p=>p.type==='image'),'No images yet.');fill('g-video',s.filter(p=>p.type==='video'),'No videos yet.');
 const q=$('q').value.trim().toLowerCase();if(page==='search'){$('sq').textContent='For "'+q+'"';fill('g-search',s.filter(p=>exact?p.tags.some(t=>t.toLowerCase()===q):(p.caption.toLowerCase().includes(q)||p.tags.some(t=>t.toLowerCase().includes(q.replace(/^#/,''))))),'Nothing found.')}}
 document.querySelector('main').onclick=e=>{const tg=e.target.closest('[data-tag]');if(tg){searchTag(tg.dataset.tag);return}const c=e.target.closest('.card');if(c)openPost(c.dataset.id)};
-function openPost(id){const p=posts.find(x=>x.id===id);if(!p)return;
-$('mb').innerHTML=p.media.map(m=>m.kind==='video'?`<video src="${m.url}" controls playsinline></video>`:`<img src="${m.url}" alt="" data-u="${m.url}">`).join('')+`<b>${esc(p.caption)}</b><div class="tg">${tagsHtml(p)}</div><div class="mu">${new Date(p.ts).toLocaleString()}</div><div class="row">${p.mine?'<button class="del" id="dl">Delete my upload</button>':''}<button id="cl">Close</button></div>`;
-$('modal').classList.add('on');$('cl').onclick=closeM;const d=$('dl');if(d){let armed=false;d.onclick=()=>{if(!armed){armed=true;d.textContent='Tap again to confirm delete';setTimeout(()=>{armed=false;d.textContent='Delete my upload'},4000)}else del(p)}}}
+function openPost(id,np){const p=posts.find(x=>x.id===id);if(!p)return;
+$('mb').innerHTML=p.media.map(m=>m.kind==='video'?`<video src="${m.url}" controls playsinline></video>`:`<img src="${m.url}" alt="" data-u="${m.url}">`).join('')+`<b>${esc(p.caption)}</b><div class="tg">${tagsHtml(p)}</div><div class="mu">${new Date(p.ts).toLocaleString()}</div><div class="row">${p.mine&&p.type==='album'?'<button id="am">+ Add more</button>':''}${p.mine?'<button class="del" id="dl">Delete my upload</button>':''}<button id="cl">Close</button></div>`;
+$('modal').classList.add('on');if(!np)history.pushState({...history.state,modal:id},'');$('cl').onclick=closeM;const am=$('am');if(am)am.onclick=()=>{addId=p.id;$('file2').click()};const d=$('dl');if(d){let armed=false;d.onclick=()=>{if(!armed){armed=true;d.textContent='Tap again to confirm delete';setTimeout(()=>{armed=false;d.textContent='Delete my upload'},4000)}else del(p)}}}
+let addId=null;
+$('file2').onchange=async()=>{const p=posts.find(x=>x.id===addId);const fl=[...$('file2').files];$('file2').value='';if(!p||!fl.length)return;
+const ok=fl.filter(f=>{if(f.size>50*1048576){toast(f.name+' is over the 50 MB limit');return false}return true});if(!ok.length)return;
+if(ok.length>30){toast('Add up to 30 files at a time');return}
+const b=$('am');if(b){b.disabled=true;b.textContent='Adding…'}
+try{const fd=new FormData();ok.forEach(f=>fd.append('files',f));const r=await fetch('/api/posts/'+p.id+'/media',{method:'POST',headers:{'x-user-id':me},body:fd});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'failed');posts=posts.map(x=>x.id===d.id?d:x);render();toast('Added '+ok.length+' item'+(ok.length>1?'s':''));if($('modal').classList.contains('on'))openPost(p.id,true)}
+catch(e){toast('Could not add: '+(e.message||'error'));const b2=$('am');if(b2){b2.disabled=false;b2.textContent='+ Add more'}}};
 let lbList=[],lbI=0,mTop=0;
 function lbShow(){$('li').src=lbList[lbI];$('lt').textContent=lbList.length>1?(lbI+1)+' / '+lbList.length:'';$('lp').style.display=$('ln').style.display=lbList.length>1?'block':'none'}
-function lbOpen(u,p){lbList=p.media.filter(m=>m.kind==='image').map(m=>m.url);lbI=Math.max(0,lbList.indexOf(u));mTop=$('modal').scrollTop;lbShow();$('lb').classList.add('on')}
-function lbClose(){$('lb').classList.remove('on');$('li').removeAttribute('src');$('modal').scrollTop=mTop}
+function lbOpen(u,p){lbList=p.media.filter(m=>m.kind==='image').map(m=>m.url);lbI=Math.max(0,lbList.indexOf(u));mTop=$('modal').scrollTop;lbShow();$('lb').classList.add('on');history.pushState({...history.state,lb:1},'')}
+function hardLbClose(){$('lb').classList.remove('on');$('li').removeAttribute('src');$('modal').scrollTop=mTop}
+function lbClose(){if(history.state&&history.state.lb)history.back();else hardLbClose()}
 function lbStep(d){lbI=(lbI+d+lbList.length)%lbList.length;lbShow()}
-$('mb').addEventListener('click',e=>{const tg=e.target.closest('[data-tag]');if(tg){const t=tg.dataset.tag;closeM();searchTag(t);return}const im=e.target.closest('img');if(im&&im.dataset.u){const id=posts.find(p=>p.media.some(m=>m.url===im.dataset.u));if(id)lbOpen(im.dataset.u,id)}});
+$('mb').addEventListener('click',e=>{const tg=e.target.closest('[data-tag]');if(tg){const t=tg.dataset.tag;hardCloseM();{const{modal,lb,...r}=history.state||{};history.replaceState(r,'')}searchTag(t);return}const im=e.target.closest('img');if(im&&im.dataset.u){const id=posts.find(p=>p.media.some(m=>m.url===im.dataset.u));if(id)lbOpen(im.dataset.u,id)}});
 $('lc').onclick=lbClose;$('lp').onclick=e=>{e.stopPropagation();lbStep(-1)};$('ln').onclick=e=>{e.stopPropagation();lbStep(1)};
 $('lb').onclick=e=>{if(e.target.id==='lb')lbClose()};
 document.addEventListener('keydown',e=>{if(!$('lb').classList.contains('on')){if(e.key==='Escape')closeM();return}if(e.key==='Escape')lbClose();if(e.key==='ArrowLeft')lbStep(-1);if(e.key==='ArrowRight')lbStep(1)});
 let tx=0;$('lb').addEventListener('touchstart',e=>tx=e.touches[0].clientX,{passive:true});$('lb').addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>60&&lbList.length>1)lbStep(d<0?1:-1)},{passive:true});
-function closeM(){$('modal').classList.remove('on');$('mb').innerHTML=''}
+function hardCloseM(){$('modal').classList.remove('on');$('mb').innerHTML=''}
+function closeM(){if(history.state&&history.state.modal)history.back();else hardCloseM()}
 $('modal').onclick=e=>{if(e.target.id==='modal')closeM()};
 async function del(p){if(!p.mine){toast('You can only delete your own uploads');return}try{const r=await fetch('/api/posts/'+p.id,{method:'DELETE',headers:{'x-user-id':me}});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'failed');posts=posts.filter(x=>x.id!==p.id);closeM();render();toast('Deleted')}catch(e){toast('Could not delete: '+(e.message||e.code||'error'))}}
 $('drop').textContent;$('drop').onclick=()=>$('file').click();
@@ -132,8 +142,14 @@ $('cap').oninput=$('tags').oninput=check;
 $('go').onclick=async()=>{const b=$('go');b.disabled=true;b.textContent='Uploading…';
 try{const fd=new FormData();files.forEach(f=>fd.append('files',f));fd.append('caption',$('cap').value.trim());fd.append('tags',JSON.stringify(parseTags()));const r=await fetch('/api/posts',{method:'POST',headers:{'x-user-id':me},body:fd});const post=await r.json().catch(()=>({}));if(!r.ok)throw new Error(post.error||'Upload failed');const type=post.type;posts.push(post);files=[];$('file').value='';$('prev').innerHTML='';$('dest').style.display='none';$('cap').value=$('tags').value='';toast('Posted!');go(type==='album'?'albums':type==='image'?'images':'videos')}
 catch(e){toast('Upload failed: '+(e.message||e.code||'error'))}b.textContent='Post';check()};
+addEventListener('popstate',e=>{const s=e.state||{page:'upload'};
+if(!s.lb&&$('lb').classList.contains('on'))hardLbClose();
+if(!s.modal&&$('modal').classList.contains('on'))hardCloseM();
+if(s.modal&&!$('modal').classList.contains('on'))openPost(s.modal,true);
+if(s.page==='search'){if(page!=='search'||$('q').value!==(s.q||'')){if(page!=='search')prev=page;$('q').value=s.q||'';exact=!!s.exact;searching=true;$('hd').classList.add('s');document.querySelectorAll('.pg').forEach(x=>x.classList.toggle('on',x.id==='p-search'));document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));page='search';render()}}
+else if(s.page!==page)go(s.page,true)});
 (()=>{try{me=localStorage.getItem('mh_uid')}catch(e){}
 if(!me||me==='anon'){me=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));try{localStorage.setItem('mh_uid',me)}catch(e){}}
 async function load(){try{const r=await fetch('/api/posts',{headers:{'x-user-id':me}});const d=await r.json();if(JSON.stringify(d)!==JSON.stringify(posts)){posts=d;render()}}catch(e){}}
-go('upload');load();setInterval(load,5000);check()})();
+history.replaceState({page:'upload'},'');go('upload',true);load();setInterval(load,5000);check()})();
 </script></body></html>

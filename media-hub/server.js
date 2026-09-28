@@ -70,10 +70,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/media/*', async (req, res) => {
   const key = req.params[0];
   try {
-    const obj = await s3.send(new GetObjectCommand({ Bucket: STORAGE_BUCKET, Key: key }));
+    const range = req.headers.range;
+    const obj = await s3.send(new GetObjectCommand({ Bucket: STORAGE_BUCKET, Key: key, ...(range && { Range: range }) }));
     res.set('Content-Type', obj.ContentType || 'application/octet-stream');
-    if (obj.ContentLength) res.set('Content-Length', obj.ContentLength);
+    res.set('Accept-Ranges', 'bytes');
     res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    if (range && obj.ContentRange) {
+      res.status(206);
+      res.set('Content-Range', obj.ContentRange);
+    }
+    if (obj.ContentLength) res.set('Content-Length', obj.ContentLength);
     obj.Body.pipe(res);
   } catch (e) {
     res.status(404).end();
@@ -108,6 +114,31 @@ app.post('/api/posts', (req, res) => {
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: 'Upload failed on the server' });
+    }
+  });
+});
+
+app.post('/api/posts/:id/media', (req, res) => {
+  upload(req, res, async err => {
+    if (err) return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({
+      error: err.code === 'LIMIT_FILE_SIZE' ? `A file is over the ${MAX_MB} MB limit` : err.message
+    });
+    try {
+      const owner = uid(req);
+      const p = posts.find(x => x.id === req.params.id);
+      if (!p) return res.status(404).json({ error: 'Not found' });
+      if (p.owner !== owner) return res.status(403).json({ error: 'You can only edit your own uploads' });
+      if (p.type !== 'album') return res.status(400).json({ error: 'Only albums can be added to' });
+      if (!req.files || !req.files.length) return res.status(400).json({ error: 'No valid photos or videos' });
+
+      const media = await Promise.all(req.files.map(putMedia));
+      if (!posts.includes(p)) { deleteMedia(media); return res.status(404).json({ error: 'Not found' }); }
+      p.media.push(...media);
+      await savePosts();
+      res.json(view(p, owner));
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Adding files failed on the server' });
     }
   });
 });
