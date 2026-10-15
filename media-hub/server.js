@@ -89,6 +89,8 @@ async function deleteMedia(list) {
 }
 
 const app = express();
+// Express ignores dot-folders by default; this lets Android verify the app via /.well-known/assetlinks.json
+app.use('/.well-known', express.static(path.join(__dirname, 'public', '.well-known')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Streams a file straight from private storage. The bucket itself never

@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.onrender.pradipali.twa",
+        "sha256_cert_fingerprints": ["77:E8:FA:B5:4B:84:18:A7:95:4D:B6:21:C4:56:9C:48:40:83:7B:C8:4E:2C:82:D5:8C:41:91:D8:3D:BD:8B:98"]
+      }
+    }]
