@@ -1,0 +1,14 @@
+{
+  "name": "Pradipta & Dipali",
+  "short_name": "P & D",
+  "description": "Our photos and videos",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fbf2f8",
+  "theme_color": "#8659c7",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
