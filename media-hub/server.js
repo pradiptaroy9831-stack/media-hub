@@ -45,9 +45,9 @@ async function savePosts() {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_MB * 1024 * 1024, files: 30 },
+  limits: { fileSize: MAX_MB * 1024 * 1024, files: 50 },
   fileFilter: (req, f, cb) => cb(null, /^(image|video)\//.test(f.mimetype))
-}).array('files', 30);
+}).array('files', 50);
 
 const uid = req => String(req.get('x-user-id') || '').slice(0, 64);
 // The owner id is never sent to other users; each client only learns "mine: true/false".
