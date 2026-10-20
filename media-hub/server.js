@@ -1,5 +1,6 @@
 const express = require('express'), multer = require('multer'), crypto = require('crypto'), path = require('path');
 const sharp = require('sharp');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const PORT = process.env.PORT || 3000;
@@ -93,12 +94,23 @@ const app = express();
 app.use('/.well-known', express.static(path.join(__dirname, 'public', '.well-known')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Streams a file straight from private storage. The bucket itself never
-// needs to be public — only this server holds the storage credentials.
+// Photos and videos: the browser is sent straight to private storage with a temporary signed link,
+// so the files never pass through this server (much faster, especially for video).
+// The bucket stays private. The link is signed from the start of the day so it stays the same
+// all day, which lets browsers cache files. Set PROXY_MEDIA=true on Render to go back to
+// streaming through this server instead.
+const PROXY_MEDIA = process.env.PROXY_MEDIA === 'true';
 app.get('/media/*', async (req, res) => {
   const key = req.params[0];
   if (!key.startsWith('uploads/')) return res.status(404).end();
   try {
+    if (!PROXY_MEDIA) {
+      const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
+      const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: STORAGE_BUCKET, Key: key }),
+        { expiresIn: 3 * 24 * 3600, signingDate: dayStart });
+      res.set('Cache-Control', 'private, max-age=3600');
+      return res.redirect(302, url);
+    }
     const range = req.headers.range;
     const obj = await s3.send(new GetObjectCommand({ Bucket: STORAGE_BUCKET, Key: key, ...(range && { Range: range }) }));
     res.set('Content-Type', obj.ContentType || 'application/octet-stream');
