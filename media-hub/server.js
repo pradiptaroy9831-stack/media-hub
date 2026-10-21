@@ -4,9 +4,13 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const PORT = process.env.PORT || 3000;
-const MAX_MB = 30;
+const MAX_MB = 50;
 
-const { STORAGE_ENDPOINT, STORAGE_REGION, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY, STORAGE_BUCKET } = process.env;
+// .trim() removes stray spaces/newlines that sneak in when pasting values into Render
+const envv = k => (process.env[k] || '').trim();
+const STORAGE_ENDPOINT = envv('STORAGE_ENDPOINT'), STORAGE_REGION = envv('STORAGE_REGION'),
+  STORAGE_ACCESS_KEY_ID = envv('STORAGE_ACCESS_KEY_ID'), STORAGE_SECRET_ACCESS_KEY = envv('STORAGE_SECRET_ACCESS_KEY'),
+  STORAGE_BUCKET = envv('STORAGE_BUCKET');
 for (const [k, v] of Object.entries({ STORAGE_ENDPOINT, STORAGE_REGION, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY, STORAGE_BUCKET })) {
   if (!v) { console.error(`Missing required environment variable: ${k}. See README.md.`); process.exit(1); }
 }
@@ -18,6 +22,9 @@ const s3 = new S3Client({
   region: STORAGE_REGION,
   endpoint: STORAGE_ENDPOINT,
   forcePathStyle: true,
+  // Newer AWS SDK versions add extra checksum headers that some S3-compatible providers reject.
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation: 'WHEN_REQUIRED',
   credentials: { accessKeyId: STORAGE_ACCESS_KEY_ID, secretAccessKey: STORAGE_SECRET_ACCESS_KEY }
 });
 
@@ -200,4 +207,12 @@ app.delete('/api/posts/:id', async (req, res) => {
 
 loadPosts()
   .then(() => app.listen(PORT, () => console.log(`MediaHub running at http://localhost:${PORT}`)))
-  .catch(e => { console.error('Could not load posts from storage on startup:', e.message); process.exit(1); });
+  .catch(e => {
+    console.error('Could not load posts from storage on startup:', e.message);
+    console.error('Details:', JSON.stringify({
+      errorName: e.name, errorCode: e.Code || e.code, httpStatus: e.$metadata?.httpStatusCode, requestId: e.$metadata?.requestId,
+      endpoint: STORAGE_ENDPOINT, region: STORAGE_REGION, bucket: STORAGE_BUCKET,
+      keyIdStartsWith: STORAGE_ACCESS_KEY_ID.slice(0, 4), keyIdLength: STORAGE_ACCESS_KEY_ID.length, secretLength: STORAGE_SECRET_ACCESS_KEY.length
+    }));
+    process.exit(1);
+  });
