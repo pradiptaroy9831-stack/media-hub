@@ -127,9 +127,6 @@ app.get('/media/*', async (req, res) => {
   }
 });
 
-// Tiny endpoint for uptime pingers (does not touch storage)
-app.get('/healthz', (req, res) => res.type('text').send('ok'));
-
 app.get('/api/posts', (req, res) => res.json(posts.map(p => view(p, uid(req)))));
 
 app.post('/api/posts', (req, res) => {
