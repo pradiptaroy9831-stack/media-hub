@@ -4,7 +4,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 
 const PORT = process.env.PORT || 3000;
-const MAX_MB = 50;
+const MAX_MB = 30;
 
 const { STORAGE_ENDPOINT, STORAGE_REGION, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY, STORAGE_BUCKET } = process.env;
 for (const [k, v] of Object.entries({ STORAGE_ENDPOINT, STORAGE_REGION, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY, STORAGE_BUCKET })) {
